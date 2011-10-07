@@ -18,14 +18,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "spindle_version.h"
 
+/* main data struct of the thread pool, returned by spindle_create() */
 typedef void* spindle_t;
+
+/* thread barrier struct, initialized by spindle_barrier_init() and destroyed by spindle_barrier_destroy() */
 typedef void* spindle_barrier_t;
+
+/* general purpose job function */
 typedef void (*spindle_job_func_t)(void *);
 
 /**
- * Creates a fixed-sized thread
- * pool.  If the function succeeds, it returns a (non-NULL)
- * "threadpool", else it returns NULL.
+ * Creates a fixed-sized thread pool. 
+ * If the function succeeds, it returns a non-NULL pointer to the pool struct, else it returns NULL.
  */
 spindle_t *spindle_create(int num_threads_in_pool);
 
@@ -44,16 +48,14 @@ spindle_t *spindle_create(int num_threads_in_pool);
 void spindle_dispatch_with_cleanup(spindle_t *from_me, spindle_barrier_t *barrier, spindle_job_func_t dispatch_to_here, void * arg, spindle_job_func_t cleaner_func, void* cleaner_arg);
 
 /**
- * 
  * The dispatched thread calls into the function
  * "dispatch_to_here" with argument "arg".
  */
 #define spindle_dispatch(from, barrier, to, arg) spindle_dispatch_with_cleanup((from), (barrier), (to), (arg), NULL, NULL)
 
 /**
- * Kills the threadpool, causing
- * all threads in it to commit suicide, and then
- * frees all the memory associated with the threadpool.
+ * Kills the threadpool, causing all threads in it to commit suicide, 
+ * and then frees all the memory associated with the threadpool.
  */
 void spindle_destroy(spindle_t *destroyme);
 
@@ -66,11 +68,30 @@ void spindle_destroy(spindle_t *destroyme);
  */
 void spindle_destroy_immediately(spindle_t *destroymenow);
 
+/**
+ * Creates and initializes barrier struct.
+ */
+spindle_barrier_t *spindle_barrier_create();
 
-void spindle_barrier_init(spindle_barrier_t *b);
+/**
+ * Starts the barrier, after that point all calls to spindle_dispatch*() have to use this barrier. 
+ */
 int spindle_barrier_start(spindle_barrier_t *b);
+
+/**
+ * Waits for the threads to finish their jobs and continues after all of the workers have finished.
+ */
 void spindle_barrier_wait(spindle_barrier_t *b);
-void spindle_barrier_end(spindle_barrier_t *b);
+
+/**
+ * Destroys and frees the barrier internal struct.
+ */
 void spindle_barrier_destroy(spindle_barrier_t *b);
+
+/**
+ * A shortcut for _wait() + _destroy()
+ */
+void spindle_barrier_end(spindle_barrier_t *b);
+
 
 #endif /* ifndef SPINDLE_H */

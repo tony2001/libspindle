@@ -13,6 +13,11 @@ You should have received a copy of the GNU Lesser General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/* this code is heavily influenced by this file: 
+ * http://people.clarkson.edu/~jmatthew/cs644.archive/cs644.fa2001/proj/locksmith/code/ExampleTest/threadpool.c
+ * but also contains a lot of modifications and improvements
+ */
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,6 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "spindle_config.h"
 #include "spindle.h"
 #include "spindle_internal.h"
+
+/* {{{ internal funcs and stuff */
 
 static inline spindle_queue_head_t *queue_create(int initial_cap) /* {{{ */
 {
@@ -230,7 +237,6 @@ static void spindle_barrier_signal(spindle_barrier_int_t *b) /* {{{ */
 }
 /* }}} */
 
-/* The Worker function */
 static void *th_do_work(void *data) /* {{{ */
 {
 	spindle_int_t *pool = (spindle_int_t *)data; 
@@ -318,6 +324,7 @@ static void *th_do_work(void *data) /* {{{ */
 }  
 /* }}} */
 
+/* }}} */
 
 spindle_t *spindle_create(int num_threads_in_pool) /* {{{ */
 {
@@ -492,14 +499,21 @@ void spindle_destroy_immediately(spindle_t *destroymenow) /* {{{ */
 }
 /* }}} */
 
-void spindle_barrier_init(spindle_barrier_t *b) /* {{{ */
+spindle_barrier_t *spindle_barrier_create(void) /* {{{ */
 {
-	spindle_barrier_int_t *barrier = (spindle_barrier_int_t *)b;
+	spindle_barrier_int_t *barrier;
+
+	barrier = malloc(sizeof(spindle_barrier_int_t));
+
+	if (!barrier) {
+		return NULL;
+	}
 
 	pthread_mutex_init(&barrier->mutex, NULL);
 	pthread_cond_init(&barrier->var, NULL);
 	barrier->posted_count = 0;
 	barrier->done_count = 0;
+	return barrier;
 }
 /* }}} */
 
@@ -531,6 +545,8 @@ void spindle_barrier_destroy(spindle_barrier_t *b) /* {{{ */
 
 	pthread_mutex_destroy(&barrier->mutex);
 	pthread_cond_destroy(&barrier->var);
+	free(barrier);
+	b = NULL;
 }
 /* }}} */
 

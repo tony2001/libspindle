@@ -1,2 +1,2 @@
 AUTOMAKE_OPTIONS=foreign no-dependencies
-SUBDIRS=src
+SUBDIRS=src examples
