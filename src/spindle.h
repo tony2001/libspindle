@@ -27,7 +27,7 @@ typedef void* spindle_barrier_t;
 /* general purpose job function */
 typedef void (*spindle_job_func_t)(void *);
 
-/* thread modifier function */
+/* thread apply function, first argument is a pointer to pthread_t */
 typedef void (*spindle_apply_func_t)(void *thread, int thread_num, void *arg);
 
 /**
@@ -57,7 +57,7 @@ void spindle_dispatch_with_cleanup(spindle_t *from_me, spindle_barrier_t *barrie
 #define spindle_dispatch(from, barrier, to, arg) spindle_dispatch_with_cleanup((from), (barrier), (to), (arg), NULL, NULL)
 
 /**
- * Apply a function to all threads in the pool 
+ * Apply a function to all threads in the pool. 
  * */
 void spindle_apply(spindle_t *p, spindle_apply_func_t func, void *arg);
 

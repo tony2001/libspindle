@@ -8,7 +8,7 @@ Data types
 spindle_t - main data struct of the thread pool, returned by spindle_create() and destroyed by spindle_destroy()
 spindle_barrier_t - thread barrier struct, returned by spindle_barrier_init() and destroyed by spindle_barrier_destroy()
 spindle_job_func_t - general purpose job function 
-
+spindle_apply_func_t - thread apply function, first argument is a pointer to pthread_t
 
 Functions
 ---------
@@ -37,6 +37,11 @@ void spindle_dispatch_with_cleanup(spindle_t *from_me, spindle_barrier_t *barrie
  * The dispatched thread calls the function "dispatch_to_here" with argument "arg".
  */
 #define spindle_dispatch(from, barrier, to, arg) spindle_dispatch_with_cleanup((from), (barrier), (to), (arg), NULL, NULL)
+
+/**
+ * Apply a function to all threads in the pool. 
+ * */
+void spindle_apply(spindle_t *p, spindle_apply_func_t func, void *arg);
 
 /**
  * Kills the threadpool, causing all threads in it to commit suicide, 
