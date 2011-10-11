@@ -27,6 +27,9 @@ typedef void* spindle_barrier_t;
 /* general purpose job function */
 typedef void (*spindle_job_func_t)(void *);
 
+/* thread modifier function */
+typedef void (*spindle_apply_func_t)(void *thread, int thread_num, void *arg);
+
 /**
  * Creates a fixed-sized thread pool. 
  * If the function succeeds, it returns a non-NULL pointer to the pool struct, else it returns NULL.
@@ -52,6 +55,11 @@ void spindle_dispatch_with_cleanup(spindle_t *from_me, spindle_barrier_t *barrie
  * "dispatch_to_here" with argument "arg".
  */
 #define spindle_dispatch(from, barrier, to, arg) spindle_dispatch_with_cleanup((from), (barrier), (to), (arg), NULL, NULL)
+
+/**
+ * Apply a function to all threads in the pool 
+ * */
+void spindle_apply(spindle_t *p, spindle_apply_func_t func, void *arg);
 
 /**
  * Kills the threadpool, causing all threads in it to commit suicide, 

@@ -50,8 +50,7 @@ typedef struct _spindle_t {
 	pthread_t      *threads;       /* The threads themselves.*/
 	pthread_mutex_t mutex;      /* protects all vars declared below.*/
 	int             size;       /* Number of threads in the pool*/
-	int             live;       /* Number of live threads in pool (when*/
-	/*   pool is being destroyed, live<=arrsz)*/
+	int             live;       /* Number of live threads in pool (when pool is being destroyed, live<=size) */
 
 	pthread_cond_t  job_posted; /* dispatcher: "Hey guys, there's a job!"*/
 	pthread_cond_t  job_taken;  /* a worker: "Got it!"*/

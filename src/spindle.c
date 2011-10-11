@@ -403,6 +403,21 @@ void spindle_dispatch_with_cleanup(spindle_t *from_me, spindle_barrier_t *barrie
 }
 /* }}} */
 
+void spindle_apply(spindle_t *p, spindle_apply_func_t func, void *arg) /* {{{ */
+{
+	spindle_int_t *pool = (spindle_int_t *) p;
+	int i;
+
+	if (!func) {
+		return;
+	}
+
+	for (i = 0; i < pool->size; i++) {
+		func(pool->threads + i, i, arg);
+	}
+}
+/* }}} */
+
 void spindle_destroy(spindle_t *destroyme) /* {{{ */
 {
 	spindle_int_t *pool = (spindle_int_t *) destroyme;
@@ -513,7 +528,7 @@ spindle_barrier_t *spindle_barrier_create(void) /* {{{ */
 	pthread_cond_init(&barrier->var, NULL);
 	barrier->posted_count = 0;
 	barrier->done_count = 0;
-	return barrier;
+	return (spindle_barrier_t *)barrier;
 }
 /* }}} */
 
