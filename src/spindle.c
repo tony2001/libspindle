@@ -363,7 +363,7 @@ spindle_t *spindle_create(int num_threads_in_pool) /* {{{ */
 			return NULL;
 		}
 		pool->live++;
-		pthread_detach(pool->threads[i]);
+		/* pthread_detach(pool->threads[i]); leave the threads joinable */
 	}
 
 	TP_DEBUG(pool, " <<< Threadpool created with %d threads.\n", num_threads_in_pool);
@@ -421,7 +421,7 @@ void spindle_apply(spindle_t *p, spindle_apply_func_t func, void *arg) /* {{{ */
 void spindle_destroy(spindle_t *destroyme) /* {{{ */
 {
 	spindle_int_t *pool = (spindle_int_t *) destroyme;
-	int oldtype;
+	int oldtype, i;
 
 	pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, &oldtype);
 	pthread_cleanup_push(spindle_mutex_unlock_wrapper, (void *) &pool->mutex); 
@@ -442,6 +442,11 @@ void spindle_destroy(spindle_t *destroyme) /* {{{ */
 		/* ... and wake up when they check out */
 		pthread_cond_wait(&pool->job_taken, &pool->mutex);
 		TP_DEBUG(pool, " >>> Destroyer: received 'job_taken'. Live = %d\n", pool->live);
+	}
+
+	for(i = 0; i < pool->size; i++) {
+		pthread_cancel(pool->threads[i]);
+		pthread_join(pool->threads[i], NULL);
 	}
 
 	memset(pool->threads, 0, pool->size * sizeof(pthread_t));
@@ -492,6 +497,7 @@ void spindle_destroy_immediately(spindle_t *destroymenow) /* {{{ */
 
 	for(i = 0; i < pool->size; i++) {
 		pthread_cancel(pool->threads[i]);
+		pthread_join(pool->threads[i], NULL);
 	}
 
 	TP_DEBUG(pool, " --- Destroyer: destroying mutex.\n");
