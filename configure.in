@@ -1,7 +1,7 @@
 dnl this files has to be processed by autoconf
 AC_PREREQ(2.61)
 
-AC_INIT([libspindle],[0.0.1])
+AC_INIT([libspindle],[1.0.0])
 AC_CONFIG_SRCDIR([README])
 AC_CONFIG_SRCDIR(src/spindle.h)
 AC_CONFIG_HEADERS(src/spindle_config.h)
@@ -27,9 +27,9 @@ AC_TYPE_SIZE_T
 dnl Checks for header files.
 AC_CHECK_HEADERS(string.h strings.h unistd.h stdint.h pthread.h)
 
-MAJOR_VERSION=0
+MAJOR_VERSION=1
 MINOR_VERSION=0
-BUGFIX_VERSION=1
+BUGFIX_VERSION=0
 EXTRA_VERSION="-dev"
 
 SPINDLE_VERSION_TEXT="${MAJOR_VERSION}.${MINOR_VERSION}.${BUGFIX_VERSION}${EXTRA_VERSION}"
@@ -64,6 +64,9 @@ done
 
 if test "$found_pthread" = "yes"; then
 	case $pthread_lib in
+		pthread)
+			LIBS="-pthread $LIBS"
+		;;
 		c)
 		;;
 		c_r)
