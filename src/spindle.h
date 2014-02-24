@@ -71,11 +71,16 @@ struct _spindle_queue_node_t
   spindle_queue_node_t *prev;
 };
 
+#define SPINDLE_DEFAULT_MAX_QUEUE_SIZE 65536
+
 /**
  * Creates a fixed-sized thread pool.
  * If the function succeeds, it returns a non-NULL pointer to the pool struct, else it returns NULL.
+ * Default pool max queue size is 65536.
  */
 spindle_t *spindle_create(int num_threads_in_pool);
+
+spindle_t *spindle_create_ex(int num_threads_in_pool, int max_queue_size);
 
 /**
  * Sends a thread off to do some work.  If all threads in the pool are busy, dispatch will

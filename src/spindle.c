@@ -33,19 +33,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /* {{{ internal funcs and stuff */
 
-static inline spindle_queue_head_t *queue_create(int initial_cap) /* {{{ */
+static inline spindle_queue_head_t *queue_create(int initial_cap, int max_cap) /* {{{ */
 {
 	spindle_queue_head_t *job_queue = (spindle_queue_head_t *) malloc (sizeof(spindle_queue_head_t));
-	int max_cap = MAX_QUEUE_MEMORY_SIZE / (sizeof(spindle_queue_node_t));
 	int i;
 	spindle_queue_node_t *temp;
 
 	if (job_queue == NULL) {
 		return NULL;
-	}
-
-	if (initial_cap > max_cap) {
-		initial_cap = max_cap;
 	}
 
 	if (initial_cap == 0) {
@@ -54,7 +49,11 @@ static inline spindle_queue_head_t *queue_create(int initial_cap) /* {{{ */
 
 	job_queue->capacity = initial_cap;
 	job_queue->posted = 0;
-	job_queue->max_capacity = max_cap;
+	if (max_cap > 0) {
+		job_queue->max_capacity = max_cap;
+	} else {
+		job_queue->max_capacity = SPINDLE_DEFAULT_MAX_QUEUE_SIZE;
+	}
 	job_queue->head = NULL;
 	job_queue->tail = NULL;
 	job_queue->free_head = (spindle_queue_node_t *) malloc (sizeof(spindle_queue_node_t));
@@ -329,10 +328,16 @@ static void *th_do_work(void *data) /* {{{ */
 
 spindle_t *spindle_create(int num_threads_in_pool) /* {{{ */
 {
+	return spindle_create_ex(num_threads_in_pool, 0);
+}
+/* }}} */
+
+spindle_t *spindle_create_ex(int num_threads_in_pool, int max_queue_size) /* {{{ */
+{
 	spindle_t *pool;
 	int i;
 
-	if (num_threads_in_pool <= 0 || num_threads_in_pool > SPINDLE_MAX_IN_POOL) {
+	if (num_threads_in_pool <= 0) {
 		return NULL;
 	}
 
@@ -345,7 +350,7 @@ spindle_t *spindle_create(int num_threads_in_pool) /* {{{ */
 	pthread_cond_init(&(pool->job_posted), NULL);
 	pthread_cond_init(&(pool->job_taken), NULL);
 	pool->size = num_threads_in_pool;
-	pool->job_queue = queue_create(num_threads_in_pool);
+	pool->job_queue = queue_create(num_threads_in_pool, max_queue_size);
 #ifdef SPINDLE_DEBUG
 	gettimeofday(&pool->created, NULL);
 #endif
