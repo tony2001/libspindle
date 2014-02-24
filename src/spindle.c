@@ -102,7 +102,7 @@ static inline void queue_destroy(spindle_queue_head_t *queue) /* {{{ */
 }
 /* }}} */
 
-static inline void queue_post_job(spindle_queue_head_t * job_queue, spindle_barrier_int_t *barrier, spindle_job_func_t func1, void * arg1, spindle_job_func_t func2, void * arg2) /* {{{ */
+static inline void queue_post_job(spindle_queue_head_t * job_queue, spindle_barrier_t *barrier, spindle_job_func_t func1, void * arg1, spindle_job_func_t func2, void * arg2) /* {{{ */
 {
 	spindle_queue_node_t *temp;
 		
@@ -150,7 +150,7 @@ static inline void queue_post_job(spindle_queue_head_t * job_queue, spindle_barr
 }
 /* }}} */
 
-static inline void queue_fetch_job(spindle_queue_head_t * job_queue, spindle_barrier_int_t **barrier, spindle_job_func_t * func1, void ** arg1, spindle_job_func_t * func2, void ** arg2) /* {{{ */
+static inline void queue_fetch_job(spindle_queue_head_t * job_queue, spindle_barrier_t **barrier, spindle_job_func_t * func1, void ** arg1, spindle_job_func_t * func2, void ** arg2) /* {{{ */
 {
 	spindle_queue_node_t *temp;
 		
@@ -182,6 +182,7 @@ static inline void queue_fetch_job(spindle_queue_head_t * job_queue, spindle_bar
 		job_queue->free_head->prev = temp;
 		job_queue->free_head = temp;
 	}
+	job_queue->posted--;
 }
 /* }}} */
 
@@ -228,7 +229,7 @@ static void spindle_mutex_unlock_wrapper(void *data) /* {{{ */
 }
 /* }}} */
 
-static void spindle_barrier_signal(spindle_barrier_int_t *b) /* {{{ */
+static void spindle_barrier_signal(spindle_barrier_t *b) /* {{{ */
 {
 	pthread_mutex_lock(&b->mutex);
 	b->done_count++;
@@ -239,8 +240,8 @@ static void spindle_barrier_signal(spindle_barrier_int_t *b) /* {{{ */
 
 static void *th_do_work(void *data) /* {{{ */
 {
-	spindle_int_t *pool = (spindle_int_t *)data; 
-	spindle_barrier_int_t *barrier;
+	spindle_t *pool = (spindle_t *)data; 
+	spindle_barrier_t *barrier;
 #ifdef SPINDLE_DEBUG
 	int myid = pool->live; /* this is wrong, but we need it only for debugging */
 #endif
@@ -328,14 +329,14 @@ static void *th_do_work(void *data) /* {{{ */
 
 spindle_t *spindle_create(int num_threads_in_pool) /* {{{ */
 {
-	spindle_int_t *pool;
+	spindle_t *pool;
 	int i;
 
 	if (num_threads_in_pool <= 0 || num_threads_in_pool > SPINDLE_MAX_IN_POOL) {
 		return NULL;
 	}
 
-	pool = (spindle_int_t *) malloc(sizeof(spindle_int_t));
+	pool = (spindle_t *) malloc(sizeof(spindle_t));
 	if (pool == NULL) {
 		return NULL;
 	}
@@ -374,8 +375,8 @@ spindle_t *spindle_create(int num_threads_in_pool) /* {{{ */
 
 void spindle_dispatch_with_cleanup(spindle_t *from_me, spindle_barrier_t *barrier, spindle_job_func_t dispatch_to_here, void *arg, spindle_job_func_t cleaner_func, void * cleaner_arg) /* {{{ */
 {
-	spindle_int_t *pool = (spindle_int_t *) from_me;
-	spindle_barrier_int_t *barrier_int = (spindle_barrier_int_t *)barrier;
+	spindle_t *pool = (spindle_t *) from_me;
+	spindle_barrier_t *barrier_int = (spindle_barrier_t *)barrier;
 	
 	pthread_cleanup_push(spindle_mutex_unlock_wrapper, (void *) &pool->mutex);
 	TP_DEBUG(pool, " >>> Dispatcher: grabbing mutex.\n");
@@ -405,7 +406,7 @@ void spindle_dispatch_with_cleanup(spindle_t *from_me, spindle_barrier_t *barrie
 
 void spindle_apply(spindle_t *p, spindle_apply_func_t func, void *arg) /* {{{ */
 {
-	spindle_int_t *pool = (spindle_int_t *) p;
+	spindle_t *pool = (spindle_t *) p;
 	int i;
 
 	if (!func) {
@@ -418,9 +419,26 @@ void spindle_apply(spindle_t *p, spindle_apply_func_t func, void *arg) /* {{{ */
 }
 /* }}} */
 
+int spindle_queue_get_posted(spindle_t *p) /* {{{ */
+{
+	spindle_t *pool = (spindle_t *) p;
+	int size;
+
+	if (0 != pthread_mutex_lock(&pool->mutex)) {
+		TP_DEBUG(pool, " >>> Dispatcher: failed to lock mutex!\n");
+		return -1;
+	}
+
+	size = pool->job_queue->posted;
+	pthread_mutex_unlock(&pool->mutex);
+
+	return size;
+}
+/* }}} */
+
 void spindle_destroy(spindle_t *destroyme) /* {{{ */
 {
-	spindle_int_t *pool = (spindle_int_t *) destroyme;
+	spindle_t *pool = (spindle_t *) destroyme;
 	int oldtype, i;
 
 	pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, &oldtype);
@@ -476,7 +494,7 @@ void spindle_destroy(spindle_t *destroyme) /* {{{ */
 	}
 
 	queue_destroy(pool->job_queue);
-	memset(pool, 0, sizeof(spindle_int_t));
+	memset(pool, 0, sizeof(spindle_t));
 
 	free(pool);
 	pool = NULL;
@@ -486,7 +504,7 @@ void spindle_destroy(spindle_t *destroyme) /* {{{ */
 
 void spindle_destroy_immediately(spindle_t *destroymenow) /* {{{ */
 {
-	spindle_int_t *pool = (spindle_int_t *) destroymenow;
+	spindle_t *pool = (spindle_t *) destroymenow;
 	int oldtype,i;
 
 	pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, &oldtype);
@@ -513,7 +531,7 @@ void spindle_destroy_immediately(spindle_t *destroymenow) /* {{{ */
 	pthread_cond_destroy(&pool->job_posted);
 	pthread_cond_destroy(&pool->job_taken);
 	
-	memset(pool, 0, sizeof(spindle_int_t));
+	memset(pool, 0, sizeof(spindle_t));
 	free(pool);
 	pool = NULL;
 	destroymenow = NULL;
@@ -522,9 +540,9 @@ void spindle_destroy_immediately(spindle_t *destroymenow) /* {{{ */
 
 spindle_barrier_t *spindle_barrier_create(void) /* {{{ */
 {
-	spindle_barrier_int_t *barrier;
+	spindle_barrier_t *barrier;
 
-	barrier = malloc(sizeof(spindle_barrier_int_t));
+	barrier = calloc(1, sizeof(spindle_barrier_t));
 
 	if (!barrier) {
 		return NULL;
@@ -540,7 +558,7 @@ spindle_barrier_t *spindle_barrier_create(void) /* {{{ */
 
 int spindle_barrier_start(spindle_barrier_t *b) /* {{{ */
 {
-	spindle_barrier_int_t *barrier = (spindle_barrier_int_t *)b;
+	spindle_barrier_t *barrier = (spindle_barrier_t *)b;
 
 	barrier->posted_count = 0;
 	barrier->done_count = 0;
@@ -550,7 +568,7 @@ int spindle_barrier_start(spindle_barrier_t *b) /* {{{ */
 
 void spindle_barrier_wait(spindle_barrier_t *b) /* {{{ */
 {
-	spindle_barrier_int_t *barrier = (spindle_barrier_int_t *)b;
+	spindle_barrier_t *barrier = (spindle_barrier_t *)b;
 
 	pthread_mutex_lock(&barrier->mutex);
 	while (barrier->done_count < barrier->posted_count) {
@@ -562,7 +580,7 @@ void spindle_barrier_wait(spindle_barrier_t *b) /* {{{ */
 
 void spindle_barrier_destroy(spindle_barrier_t *b) /* {{{ */
 {
-	spindle_barrier_int_t *barrier = (spindle_barrier_int_t *)b;
+	spindle_barrier_t *barrier = (spindle_barrier_t *)b;
 
 	pthread_mutex_destroy(&barrier->mutex);
 	pthread_cond_destroy(&barrier->var);
